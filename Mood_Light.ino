@@ -123,7 +123,7 @@ void setup() {
 }
 
 void loop() {
-  if (Serial.available() != 0) {
+  if (Serial.available() != 0) { // maybe try to read in all available bytes until /n before processing
     //Serial.println("1");
     while (Serial.available() > 0) { //[INCOMPLETE] Serial comms command list. To do: clear buffer as needed
       uint8_t cmd = Serial.read(); // read in command byte;
