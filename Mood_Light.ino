@@ -1,5 +1,7 @@
 //#define FASTLED_INTERRUPT_RETRY_COUNT 0
 
+#define WAIT_FOR_SERIAL(x) while(Serial.available()<x)
+
 #include <Wire.h>
 #include <FastLED.h>
 
@@ -18,10 +20,10 @@ uint8_t aIdx = 0; //animation index from 0 to 255
 
 CRGBPalette16 currentPalette;
 
-uint8_t currMode = 0;
-uint8_t currR = 255;
-uint8_t currG = 255;
-uint8_t currB = 255;
+uint8_t currMode;
+uint8_t currR;
+uint8_t currG;
+uint8_t currB;
 bool currSolidHasChanged = false; //its time to update the LEDs
 /*
    Mode Definition:
@@ -68,6 +70,7 @@ void writeEEPROM(uint8_t _data, int address) {
 
   Word 16 contains the last set brightness
   Word 17 contains the last set mode
+  Words 18, 19, and 20 contain the last used RGB solid color value
 
 */
 void loadPalette(CRGBPalette16& palette, int index) { // pass in the target palette and also which palette to load (from EEPROM)
@@ -98,10 +101,15 @@ void setup() {
   Wire.setClock(400000); //fast mode 400kHz
 
   FastLED.addLeds<LED_TYPE, DATA_PIN, COLOR_ORDER>(leds, NUM_LEDS).setCorrection(TypicalLEDStrip);
+
+  //load in last configs
   brightness = readEEPROM(16); //load last configured brightness
   FastLED.setBrightness(brightness);
-  currMode = readEEPROM(17);
+  currMode = readEEPROM(17); // load last configured mode
   currSolidHasChanged = true; //update LEDS at least once on wake
+  currR = readEEPROM(18);
+  currG = readEEPROM(19);
+  currB = readEEPROM(20);
 
 
   loadPalette(currentPalette, 1);
@@ -123,17 +131,21 @@ void setup() {
 }
 
 void loop() {
-  if (Serial.available() != 0) { // maybe try to read in all available bytes until /n before processing
+  if (Serial.available()) {
+    FastLED.show();
     //Serial.println("1");
     while (Serial.available() > 0) { //[INCOMPLETE] Serial comms command list. To do: clear buffer as needed
       uint8_t cmd = Serial.read(); // read in command byte;
+      
       if (cmd == 0xdf) { // swap palette
+        WAIT_FOR_SERIAL(1); // wait for the slow 9600 baud crap
         uint8_t paletteNumber = Serial.read();
         loadPalette(currentPalette, paletteNumber);
         Serial.println(paletteNumber);
         aIdx = 0; //reset animation index
       }
       else if (cmd == 0xbb) { // change master brightness
+        WAIT_FOR_SERIAL(1);
         brightness = Serial.read(); // brightness has already been delcared
         writeEEPROM(brightness, 16);
         FastLED.setBrightness(brightness);
@@ -141,16 +153,23 @@ void loop() {
 
       }
       else if (cmd == 0xc7) { //change mode
+        WAIT_FOR_SERIAL(1);
         currMode = Serial.read();
         writeEEPROM(currMode, 17);
         currSolidHasChanged = true;
         Serial.println(currMode);
         aIdx = 0; //reset animation index
       }
-      else if (cmd == 0xcc) { //set color [CRITICAL] THIS ROUTINE DOES NOT WORK FOR WHATEVER REASON
+      else if (cmd == 0xcc) { //set color 
+        WAIT_FOR_SERIAL(3); //Real trap for young players! absolutely came a gutsa here -> maybe blog about this
         currR = Serial.read();
         currG = Serial.read();
         currB = Serial.read();
+        
+        writeEEPROM(currR, 18); //commit changes to EEPROM
+        writeEEPROM(currG, 19);
+        writeEEPROM(currB, 20);
+        
         currSolidHasChanged = true;
         Serial.println(currR);
         Serial.println(currG);
@@ -168,7 +187,9 @@ void loop() {
 
   if (currMode == 0 && currSolidHasChanged == true) { //solid color mode
     for (int i = 0; i < NUM_LEDS; i++) {
-      leds[i] = (currR<<16)|(currG<<8)|(currB);
+      leds[i].r = currR;
+      leds[i].g = currG;
+      leds[i].b = currB;
     }
     currSolidHasChanged = false;
   }
@@ -192,7 +213,7 @@ void loop() {
   else if (currMode == 3 && currSolidHasChanged == true){
     //fill_solid(leds, NUM_LEDS, CRGB(0xF6, 0xCD, 0x8B)); //generic warm white
     for (int i = 0; i < NUM_LEDS; i++) {
-      leds[i] = 0xFF9329;
+      leds[i] = 0xFFAF29;
     }
     currSolidHasChanged = false;
   }
