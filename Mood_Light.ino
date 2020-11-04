@@ -21,13 +21,13 @@ RTC_DS3231 rtc;
 uint8_t prevMinute;
 alarm alarms[16];
 /*
-  Array that contains the alarm data,
+  Array that contains the alarm data retrieved from EEPROM
   first layer has hour values,
   second has minute values,
   third has function to call,
   fourth, fifth and sixth have the specific parameters to that function
 
-  Definitions:
+  Definitions in EEPROM:
   Mode 0: Solid Color
   First Layer: R value
   Second Layer: G value
