@@ -143,7 +143,7 @@ void loadPalette(CRGBPalette16& palette, int index) { // pass in the target pale
     data[j] = (uint8_t)Wire.read();
   }
   palette.loadDynamicGradientPalette(data);
-
+  return;
 }
 
 void loadAlarms() {
@@ -155,6 +155,7 @@ void loadAlarms() {
     alarms[i].parameter2 = readEEPROM(128 + i);
     alarms[i].parameter3 = readEEPROM(144 + i);
   }
+  return;
 }
 
 
